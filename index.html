@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <!-- PWA / 原生 App 体验 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="今日菜单">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#FF6B35">
+  <meta name="apple-touch-icon" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍳</text></svg>">
+  <link rel="manifest" href="data:application/json,{%22name%22:%22%E4%BB%8A%E6%97%A5%E8%8F%9C%E5%8D%95%22,%22short_name%22:%22%E8%8F%9C%E5%8D%95%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22theme_color%22:%22%23FF6B35%22,%22background_color%22:%22%23ffffff%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍳</text></svg>%22,%22sizes%22:%22100x100%22,%22type%22:%22image/svg+xml%22}]}">
+
+  <title>🍳 今日菜单 - 点菜 & 菜谱</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#FF6B35',
+            secondary: '#F7C948',
+            accent: '#2EC4B6',
+            dark: '#1A1A2E',
+            light: '#FFF8F0',
+          },
+          fontFamily: {
+            sans: ['"PingFang SC"', '"Microsoft YaHei"', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <!-- 自定义样式 -->
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body {
+      background: #fef9f4;
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      overscroll-behavior: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* 底部安全区域 */
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* 底部导航栏 */
+    .bottom-nav {
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(255, 255, 255, 0.92);
+      border-top: 0.5px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .bottom-nav .nav-item {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .bottom-nav .nav-item.active {
+      color: #FF6B35;
+    }
+    .bottom-nav .nav-item.active .nav-icon {
+      transform: translateY(-2px);
+    }
+    .bottom-nav .nav-item:active {
+      transform: scale(0.9);
+    }
+
+    .nav-icon {
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* 添加到主屏幕引导 */
+    @keyframes guideSlideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .guide-banner {
+      animation: guideSlideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    /* 隐藏滚动条 */
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* 分类标签动画 */
+    .category-tab {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .category-tab.active {
+      transform: scale(1.05);
+      box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+    }
+
+    /* 卡片悬浮效果 */
+    .dish-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .dish-card:active {
+      transform: scale(0.97);
+    }
+
+    /* 选中脉冲动画 */
+    @keyframes checkPulse {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .check-animate {
+      animation: checkPulse 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    /* 底部栏滑入 */
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .bottom-bar-enter {
+      animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    /* Drawer 弹窗 */
+    .drawer-overlay {
+      transition: opacity 0.35s ease;
+    }
+    .drawer-overlay-enter { opacity: 1; }
+    .drawer-overlay-leave { opacity: 0; }
+
+    .drawer-panel {
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .drawer-panel-enter { transform: translateY(0); }
+    .drawer-panel-leave { transform: translateY(100%); }
+
+    /* Modal 弹窗 */
+    .modal-overlay {
+      transition: opacity 0.3s ease;
+    }
+    .modal-content {
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* 步骤编号 */
+    .step-badge {
+      background: linear-gradient(135deg, #FF6B35, #F7C948);
+    }
+
+    /* 食材标签 */
+    .ingredient-tag {
+      background: #FFF8F0;
+      border: 1px solid #FFE0CC;
+    }
+
+    /* 图片占位 */
+    .img-placeholder {
+      background: linear-gradient(135deg, #fdf2e9 0%, #fadbd8 50%, #fef9e7 100%);
+    }
+
+    /* 按钮波纹 */
+    .btn-ripple {
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-ripple::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle, rgba(255,255,255,0.4) 10%, transparent 10%);
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0;
+      transition: opacity 0.5s, background-size 0.5s;
+      background-size: 0% 0%;
+    }
+    .btn-ripple:active::after {
+      background-size: 200% 200%;
+      opacity: 1;
+      transition: background-size 0s;
+    }
+
+    /* Toast */
+    @keyframes toastIn {
+      from { opacity: 0; transform: translate(-50%, 20px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+    @keyframes toastOut {
+      from { opacity: 1; transform: translate(-50%, 0); }
+      to { opacity: 0; transform: translate(-50%, -20px); }
+    }
+    .toast-enter { animation: toastIn 0.3s ease forwards; }
+    .toast-leave { animation: toastOut 0.3s ease forwards; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="app" class="max-w-lg mx-auto relative min-h-screen bg-white shadow-2xl overflow-hidden">
+    <!-- ========== 顶部导航栏 ========== -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 pt-2">
+      <!-- 安全区域 -->
+      <div class="h-[env(safe-area-inset-top,0px)]"></div>
+      <div class="flex items-center justify-between px-4 py-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🍳</span>
+          <h1 class="text-xl font-bold text-gray-800 tracking-wide">今日菜单</h1>
+        </div>
+        <button
+          @click="showSettings = true"
+          class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 active:scale-95 transition-all duration-200"
+          title="数据管理"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- 分类横向滑动标签 -->
+      <nav class="px-4 pb-3 overflow-x-auto hide-scrollbar" ref="categoryNav">
+        <div class="flex gap-2 min-w-max">
+          <button
+            v-for="cat in categories"
+            :key="cat"
+            @click="activeCategory = cat"
+            class="category-tab flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300"
+            :class="activeCategory === cat
+              ? 'active bg-primary text-white shadow-md'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+          >
+            {{ cat }}
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- ========== 菜品网格 ========== -->
+    <main class="px-3 pt-4" style="padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));">
+      <!-- 空状态 -->
+      <div v-if="filteredDishes.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
+        <span class="text-6xl mb-4">🍽️</span>
+        <p class="text-lg">暂无菜品</p>
+        <p class="text-sm mt-1">点击右上角 + 录入新菜品吧~</p>
+      </div>
+
+      <!-- 两列网格 -->
+      <div v-else class="grid grid-cols-2 gap-3">
+        <div
+          v-for="dish in filteredDishes"
+          :key="dish.id"
+          class="dish-card relative bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 cursor-pointer"
+          @click="openDetail(dish)"
+        >
+          <!-- 菜品图片 -->
+          <div class="relative aspect-[4/3] overflow-hidden img-placeholder">
+            <img
+              v-if="dish.image"
+              :src="dish.image"
+              :alt="dish.name"
+              class="w-full h-full object-cover"
+              loading="lazy"
+              @error="handleImgError($event)"
+            />
+            <div v-else class="w-full h-full flex items-center justify-center text-4xl">
+              {{ getEmoji(dish.category) }}
+            </div>
+            <!-- 渐变遮罩 -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+
+            <!-- 烹饪时间 -->
+            <span class="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium bg-white/90 text-gray-700 backdrop-blur-sm">
+              ⏱ {{ dish.cookingTime }}
+            </span>
+
+            <!-- 选中勾选 -->
+            <div
+              v-if="isSelected(dish.id)"
+              class="check-animate absolute top-2 right-2 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-lg"
+            >
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- 卡片信息 -->
+          <div class="p-3">
+            <h3 class="font-semibold text-gray-800 text-sm leading-tight line-clamp-1">{{ dish.name }}</h3>
+            <p class="text-xs text-gray-400 mt-1">{{ dish.category }}</p>
+
+            <!-- 选入菜单按钮 -->
+            <button
+              @click.stop="toggleSelect(dish)"
+              class="btn-ripple mt-3 w-full py-2 rounded-xl text-xs font-bold transition-all duration-300"
+              :class="isSelected(dish.id)
+                ? 'bg-primary/10 text-primary border border-primary/30'
+                : 'bg-primary text-white shadow-md shadow-primary/20 hover:shadow-primary/30'"
+            >
+              <span v-if="isSelected(dish.id)">✓ 已选入</span>
+              <span v-else>+ 选入今日菜单</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ========== 底部导航栏 (App 风格) ========== -->
+    <nav class="bottom-nav fixed bottom-0 left-0 right-0 max-w-lg mx-auto z-30 safe-bottom">
+      <div class="flex items-center justify-around h-16 px-2">
+        <!-- 首页 -->
+        <button
+          @click="activeTab = 'home'"
+          class="nav-item flex flex-col items-center justify-center gap-0.5 flex-1 h-full"
+          :class="activeTab === 'home' ? 'active' : 'text-gray-400'"
+        >
+          <span class="nav-icon text-xl">🏠</span>
+          <span class="text-[10px] font-medium">首页</span>
+        </button>
+
+        <!-- 清单 -->
+        <button
+          @click="showSelectedList = true"
+          class="nav-item flex flex-col items-center justify-center gap-0.5 flex-1 h-full relative text-gray-400"
+        >
+          <span class="nav-icon text-xl">📋</span>
+          <span class="text-[10px] font-medium">清单</span>
+          <span
+            v-if="selectedDishes.length > 0"
+            class="absolute top-1 right-1/3 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1"
+          >
+            {{ selectedDishes.length }}
+          </span>
+        </button>
+
+        <!-- 录入 -->
+        <button
+          @click="showAddModal = true"
+          class="nav-item flex flex-col items-center justify-center gap-0.5 flex-1 h-full"
+          :class="activeTab === 'add' ? 'active' : 'text-gray-400'"
+        >
+          <span class="nav-icon text-xl">➕</span>
+          <span class="text-[10px] font-medium">录入</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ========== 添加到主屏幕引导 ========== -->
+    <transition name="guide">
+      <div
+        v-if="showGuide"
+        class="guide-banner fixed bottom-0 left-0 right-0 max-w-lg mx-auto z-40 px-3 safe-bottom"
+        style="bottom: 64px;"
+      >
+        <div class="bg-gradient-to-r from-primary to-orange-500 rounded-2xl shadow-2xl shadow-primary/30 px-4 py-3.5">
+          <div class="flex items-start gap-3">
+            <span class="text-3xl flex-shrink-0">📲</span>
+            <div class="flex-1 min-w-0">
+              <p class="text-white font-bold text-sm mb-1">添加到主屏幕，体验更好！</p>
+              <div class="text-white/90 text-xs space-y-1" v-if="isIOS">
+                <p>点击底部 <span class="inline-block align-middle"><svg class="w-4 h-4 inline" fill="currentColor" viewBox="0 0 20 20"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM18 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg></span> →「添加到主屏幕」</p>
+              </div>
+              <div class="text-white/90 text-xs space-y-1" v-else>
+                <p>点击右上角 <span class="font-bold">⋮</span> →「添加到主屏幕」</p>
+              </div>
+            </div>
+            <button
+              @click="showGuide = false"
+              class="w-6 h-6 flex items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors flex-shrink-0"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ========== 底部已选结算栏 ========== -->
+    <transition name="bottom-bar">
+      <div
+        v-if="selectedDishes.length > 0"
+        class="bottom-bar-enter fixed left-0 right-0 max-w-lg mx-auto z-20 px-4 pb-2"
+        style="bottom: calc(64px + env(safe-area-inset-bottom, 0px));"
+      >
+        <div class="bg-dark text-white rounded-2xl shadow-2xl shadow-dark/30 px-5 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="relative">
+              <span class="text-xl">🛒</span>
+              <span class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {{ selectedDishes.length }}
+              </span>
+            </div>
+            <div>
+              <p class="text-sm font-bold">已选 <span class="text-secondary">{{ selectedDishes.length }}</span> 道菜</p>
+              <p class="text-[10px] text-gray-400">点击查看清单</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              @click="clearAll"
+              class="text-xs text-gray-400 hover:text-white transition-colors px-2 py-1"
+            >
+              清空
+            </button>
+            <button
+              @click="showSelectedList = true"
+              class="px-5 py-2 rounded-xl bg-secondary text-dark text-sm font-bold hover:scale-105 active:scale-95 transition-all duration-200"
+            >
+              查看清单
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ========== 已选清单弹窗 ========== -->
+    <transition name="modal">
+      <div
+        v-if="showSelectedList"
+        class="modal-overlay fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
+        @click.self="showSelectedList = false"
+      >
+        <div class="modal-content w-full max-w-lg bg-white rounded-t-3xl max-h-[70vh] flex flex-col">
+          <!-- 清单头部 -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-bold text-gray-800">📋 今日菜单清单</h2>
+            <button
+              @click="showSelectedList = false"
+              class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- 清单列表 -->
+          <div class="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+            <div
+              v-for="(dish, idx) in selectedDishes"
+              :key="dish.id"
+              class="flex items-center gap-3 p-3 rounded-xl bg-gray-50"
+            >
+              <span class="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                {{ idx + 1 }}
+              </span>
+              <div class="flex-1 min-w-0">
+                <p class="font-medium text-gray-800 text-sm">{{ dish.name }}</p>
+                <p class="text-xs text-gray-400">{{ dish.cookingTime }} · {{ dish.category }}</p>
+              </div>
+              <button
+                @click="toggleSelect(dish); $event.stopPropagation()"
+                class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center hover:bg-red-200 transition-colors"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 清单底部 -->
+          <div class="px-5 py-4 border-t border-gray-100">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm text-gray-500">合计</span>
+              <span class="text-lg font-bold text-primary">{{ selectedDishes.length }} 道菜</span>
+            </div>
+            <button
+              @click="shareMenu"
+              class="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 active:scale-[0.98] transition-all duration-200"
+            >
+              📤 分享菜单
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ========== 菜品详情 Drawer ========== -->
+    <transition name="drawer">
+      <div
+        v-if="currentDish"
+        class="drawer-overlay fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+        @click.self="closeDetail"
+      >
+        <div class="drawer-panel absolute bottom-0 left-0 right-0 max-w-lg mx-auto max-h-[90vh] bg-white rounded-t-3xl flex flex-col overflow-hidden shadow-2xl">
+          <!-- 拖拽条 -->
+          <div class="flex justify-center pt-3 pb-1">
+            <div class="w-10 h-1 rounded-full bg-gray-300"></div>
+          </div>
+
+          <!-- Drawer 头部 -->
+          <div class="flex items-center justify-between px-5 py-2 border-b border-gray-100">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">{{ getEmoji(currentDish.category) }}</span>
+              <div>
+                <h2 class="text-lg font-bold text-gray-800">{{ currentDish.name }}</h2>
+                <p class="text-xs text-gray-400">{{ currentDish.category }} · ⏱ {{ currentDish.cookingTime }}</p>
+              </div>
+            </div>
+            <button
+              @click="closeDetail"
+              class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Drawer 内容 -->
+          <div class="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+            <!-- 菜品大图 -->
+            <div class="relative rounded-2xl overflow-hidden aspect-[16/9] img-placeholder">
+              <img
+                v-if="currentDish.image"
+                :src="currentDish.image"
+                :alt="currentDish.name"
+                class="w-full h-full object-cover"
+                @error="handleImgError($event)"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center text-6xl">
+                {{ getEmoji(currentDish.category) }}
+              </div>
+            </div>
+
+            <!-- 食材清单 -->
+            <section>
+              <h3 class="flex items-center gap-2 text-base font-bold text-gray-800 mb-3">
+                <span>🛒</span> 食材清单
+              </h3>
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for="(ing, i) in currentDish.ingredients"
+                  :key="i"
+                  class="ingredient-tag px-3 py-1.5 rounded-lg text-sm text-gray-700"
+                >
+                  {{ ing.name }}
+                  <span class="text-gray-400 ml-1">{{ ing.amount }}</span>
+                </span>
+              </div>
+            </section>
+
+            <!-- 烹饪步骤 -->
+            <section>
+              <h3 class="flex items-center gap-2 text-base font-bold text-gray-800 mb-3">
+                <span>👨‍🍳</span> 烹饪步骤
+              </h3>
+              <div class="space-y-4">
+                <div
+                  v-for="(step, i) in currentDish.steps"
+                  :key="i"
+                  class="flex gap-3"
+                >
+                  <div class="flex-shrink-0 w-8 h-8 rounded-full step-badge flex items-center justify-center text-white text-sm font-bold shadow-md">
+                    {{ i + 1 }}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-gray-800">{{ step.title }}</p>
+                    <p class="text-sm text-gray-600 mt-1 leading-relaxed">{{ step.description }}</p>
+                    <img
+                      v-if="step.image"
+                      :src="step.image"
+                      :alt="'步骤' + (i+1)"
+                      class="mt-2 rounded-xl w-full max-h-48 object-cover"
+                      loading="lazy"
+                      @error="handleImgError($event)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- 独家小贴士 -->
+            <section v-if="currentDish.tips">
+              <h3 class="flex items-center gap-2 text-base font-bold text-gray-800 mb-3">
+                <span>💡</span> 独家小贴士
+              </h3>
+              <div class="p-4 rounded-2xl bg-yellow-50 border border-yellow-200">
+                <p class="text-sm text-gray-700 leading-relaxed">{{ currentDish.tips }}</p>
+              </div>
+            </section>
+          </div>
+
+          <!-- Drawer 底部按钮 -->
+          <div class="px-5 py-4 border-t border-gray-100 bg-white">
+            <button
+              @click="toggleSelect(currentDish)"
+              class="w-full py-3.5 rounded-xl font-bold text-sm transition-all duration-300 active:scale-[0.98]"
+              :class="isSelected(currentDish.id)
+                ? 'bg-primary/10 text-primary border-2 border-primary'
+                : 'bg-primary text-white shadow-lg shadow-primary/25'"
+            >
+              <span v-if="isSelected(currentDish.id)">✓ 已选入今日菜单（点击移除）</span>
+              <span v-else>+ 选入今日菜单</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ========== 录入菜品 Modal ========== -->
+    <transition name="modal">
+      <div
+        v-if="showAddModal"
+        class="modal-overlay fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
+        @click.self="showAddModal = false"
+      >
+        <div class="modal-content w-full max-w-lg bg-white rounded-t-3xl max-h-[85vh] flex flex-col shadow-2xl">
+          <!-- Modal 头部 -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-bold text-gray-800">➕ 录入新菜品</h2>
+            <button
+              @click="showAddModal = false"
+              class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Modal 表单 -->
+          <form @submit.prevent="addDish" class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            <!-- 菜名 -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">🍽️ 菜名 <span class="text-red-400">*</span></label>
+              <input
+                v-model="form.name"
+                type="text"
+                required
+                placeholder="例如：红烧排骨"
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+              />
+            </div>
+
+            <!-- 分类 -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">📂 分类 <span class="text-red-400">*</span></label>
+              <select
+                v-model="form.category"
+                required
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all bg-white"
+              >
+                <option value="" disabled>请选择分类</option>
+                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+              </select>
+            </div>
+
+            <!-- 烹饪时间 -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">⏱ 烹饪时间 <span class="text-red-400">*</span></label>
+              <input
+                v-model="form.cookingTime"
+                type="text"
+                required
+                placeholder="例如：30分钟"
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+              />
+            </div>
+
+            <!-- 图片链接 -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">🖼️ 图片链接</label>
+              <input
+                v-model="form.image"
+                type="url"
+                placeholder="粘贴图片URL（可选）"
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+              />
+              <p class="text-[10px] text-gray-400 mt-1">支持任意网络图片链接，留空则显示分类图标</p>
+            </div>
+
+            <!-- 食材清单 -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">🛒 食材清单 <span class="text-red-400">*</span></label>
+              <div class="space-y-2 mb-2">
+                <div
+                  v-for="(ing, i) in form.ingredients"
+                  :key="i"
+                  class="flex gap-2"
+                >
+                  <input
+                    v-model="ing.name"
+                    type="text"
+                    placeholder="食材名"
+                    class="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                  <input
+                    v-model="ing.amount"
+                    type="text"
+                    placeholder="用量"
+                    class="w-24 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                  <button
+                    type="button"
+                    @click="form.ingredients.splice(i, 1)"
+                    class="w-9 h-9 flex items-center justify-center rounded-lg bg-red-50 text-red-400 hover:bg-red-100 transition-colors flex-shrink-0"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="form.ingredients.push({ name: '', amount: '' })"
+                class="w-full py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-sm hover:border-primary hover:text-primary transition-all"
+              >
+                + 添加食材
+              </button>
+            </div>
+
+            <!-- 烹饪步骤 -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">👨‍🍳 烹饪步骤 <span class="text-red-400">*</span></label>
+              <div class="space-y-3 mb-2">
+                <div
+                  v-for="(step, i) in form.steps"
+                  :key="i"
+                  class="p-3 rounded-xl bg-gray-50 border border-gray-100"
+                >
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-primary">步骤 {{ i + 1 }}</span>
+                    <button
+                      type="button"
+                      @click="form.steps.splice(i, 1)"
+                      class="text-xs text-red-400 hover:text-red-600"
+                    >
+                      删除
+                    </button>
+                  </div>
+                  <input
+                    v-model="step.title"
+                    type="text"
+                    placeholder="步骤标题（如：准备食材）"
+                    class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                  <textarea
+                    v-model="step.description"
+                    rows="2"
+                    placeholder="详细描述..."
+                    class="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                  ></textarea>
+                  <input
+                    v-model="step.image"
+                    type="url"
+                    placeholder="步骤配图URL（可选）"
+                    class="w-full px-3 py-2 mt-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="form.steps.push({ title: '', description: '', image: '' })"
+                class="w-full py-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-sm hover:border-primary hover:text-primary transition-all"
+              >
+                + 添加步骤
+              </button>
+            </div>
+
+            <!-- 小贴士 -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">💡 独家小贴士</label>
+              <textarea
+                v-model="form.tips"
+                rows="2"
+                placeholder="分享你的独家秘诀..."
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
+              ></textarea>
+            </div>
+
+            <!-- 提交按钮 -->
+            <button
+              type="submit"
+              class="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 active:scale-[0.98] transition-all duration-200"
+            >
+              ✅ 提交菜品
+            </button>
+          </form>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ========== Toast 提示 ========== -->
+    <transition name="toast">
+      <div
+        v-if="toast.show"
+        :class="['fixed top-6 left-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl text-sm font-medium toast-enter', toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white']"
+      >
+        {{ toast.message }}
+      </div>
+    </transition>
+
+    <!-- ========== 数据管理弹窗 ========== -->
+    <transition name="modal">
+      <div
+        v-if="showSettings"
+        class="modal-overlay fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
+        @click.self="showSettings = false"
+      >
+        <div class="modal-content w-full max-w-lg bg-white rounded-t-3xl shadow-2xl">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-bold text-gray-800">⚙️ 数据管理</h2>
+            <button
+              @click="showSettings = false"
+              class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="px-5 py-5 space-y-4">
+            <!-- 同步状态 -->
+            <div class="p-3 rounded-xl border text-xs leading-relaxed"
+              :class="gistReady ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-500'">
+              <div v-if="gistReady">
+                <span>🟢 Gist 云同步已配置</span>
+                <span class="block mt-1 opacity-70">最近同步：{{ lastSyncTime }}</span>
+                <span v-if="tokenConfigSaved" class="block mt-1 opacity-70">🔑 Token 已配置（双向同步）</span>
+                <span v-else class="block mt-1 opacity-70 text-amber-600">⚠️ Token 未配置（只能拉取，无法写入）</span>
+              </div>
+              <span v-else>⚪ 本地模式 — 配置 Gist ID 后开启云同步</span>
+            </div>
+
+            <!-- 说明 -->
+            <div class="p-3 rounded-xl bg-blue-50 border border-blue-200">
+              <p class="text-xs text-blue-700 leading-relaxed">
+                💡 <b>云同步用法：</b>在 https://gist.github.com 创建 caidan-data.json，把 Gist ID 填到 index.html，刷新即可。
+              </p>
+            </div>
+
+            <!-- Token 配置按钮 -->
+            <div v-if="gistReady" class="grid grid-cols-2 gap-2">
+              <button
+                v-if="!tokenConfigSaved"
+                @click="showTokenDialog = true"
+                class="flex items-center justify-center gap-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 hover:bg-amber-100 active:scale-[0.98] transition-all"
+              >
+                <span class="text-lg">🔑</span>
+                <span class="font-semibold text-amber-800 text-sm">配置 Token</span>
+              </button>
+              <button
+                v-else
+                @click="showTokenDialog = true"
+                class="flex items-center justify-center gap-2 p-3 rounded-2xl bg-blue-50 border border-blue-200 hover:bg-blue-100 active:scale-[0.98] transition-all"
+              >
+                <span class="text-lg">🔑</span>
+                <span class="font-semibold text-blue-800 text-sm">修改 Token</span>
+              </button>
+              <button
+                v-if="tokenConfigSaved"
+                @click="clearToken"
+                class="flex items-center justify-center gap-2 p-3 rounded-2xl bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98] transition-all"
+              >
+                <span class="text-lg">🗑️</span>
+                <span class="font-semibold text-red-800 text-sm">清除 Token</span>
+              </button>
+            </div>
+
+            <!-- 手动同步按钮（仅在配置后显示） -->
+            <button
+              v-if="gistReady"
+              @click="manualSync"
+              :disabled="isSyncing"
+              class="w-full flex items-center gap-3 p-4 rounded-2xl bg-purple-50 border border-purple-200 hover:bg-purple-100 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              <span class="text-2xl">☁️</span>
+              <div class="text-left flex-1">
+                <p class="font-semibold text-purple-800 text-sm">{{ isSyncing ? '同步中...' : '一键云同步' }}</p>
+                <p class="text-xs text-purple-600">拉取云端最新数据并合并</p>
+              </div>
+              <svg v-if="!isSyncing" class="w-5 h-5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              <svg v-else class="w-5 h-5 text-purple-500 flex-shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </button>
+
+            <!-- 导出 -->
+            <button
+              @click="exportData"
+              class="w-full flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all"
+            >
+              <span class="text-2xl">📤</span>
+              <div class="text-left flex-1">
+                <p class="font-semibold text-green-800 text-sm">导出数据</p>
+                <p class="text-xs text-green-600">下载菜品数据为 JSON 文件</p>
+              </div>
+              <svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+            </button>
+
+            <!-- 导入 -->
+            <div>
+              <input
+                ref="fileInput"
+                type="file"
+                accept=".json"
+                @change="importData"
+                class="hidden"
+              />
+              <button
+                @click="$refs.fileInput.click()"
+                class="w-full flex items-center gap-3 p-4 rounded-2xl bg-blue-50 border border-blue-200 hover:bg-blue-100 active:scale-[0.98] transition-all"
+              >
+                <span class="text-2xl">📥</span>
+                <div class="text-left flex-1">
+                  <p class="font-semibold text-blue-800 text-sm">导入数据</p>
+                  <p class="text-xs text-blue-600">从 JSON 文件恢复菜品数据</p>
+                </div>
+                <svg class="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- 恢复默认 -->
+            <button
+              @click="resetData"
+              class="w-full flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98] transition-all"
+            >
+              <span class="text-2xl">🔄</span>
+              <div class="text-left flex-1">
+                <p class="font-semibold text-red-800 text-sm">恢复默认数据</p>
+                <p class="text-xs text-red-600">清空所有菜品，恢复预设的 5 道菜</p>
+              </div>
+              <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ========== Token 输入弹窗 ========== -->
+    <transition name="modal">
+      <div
+        v-if="showTokenDialog"
+        class="modal-overlay fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-end justify-center"
+        @click.self="showTokenDialog = false"
+      >
+        <div class="modal-content w-full max-w-lg bg-white rounded-t-3xl shadow-2xl">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-bold text-gray-800">🔑 配置 GitHub Token</h2>
+            <button
+              @click="showTokenDialog = false"
+              class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="px-5 py-5 space-y-4">
+            <!-- 说明 -->
+            <div class="p-3 rounded-xl bg-blue-50 border border-blue-200">
+              <p class="text-xs text-blue-700 leading-relaxed">
+                🔒 <b>Token 不会写进文件</b>，只保存在你本机的浏览器 localStorage 里，关掉浏览器也还在。
+                <br><br>
+                📋 <b>如何获取 Token：</b>打开 https://github.com/settings/tokens/new → 勾选 <code>gist</code> → Generate token
+              </p>
+            </div>
+
+            <!-- 输入框 -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">GitHub Token</label>
+              <div class="relative">
+                <input
+                  v-model="tokenInput"
+                  :type="showToken ? 'text' : 'password'"
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                  class="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300 focus:border-orange-500 focus:outline-none text-sm font-mono"
+                  @keyup.enter="saveToken"
+                />
+                <button
+                  @click="showToken = !showToken"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  type="button"
+                >
+                  <svg v-if="!showToken" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  </svg>
+                  <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                  </svg>
+                </button>
+              </div>
+              <p class="mt-1 text-xs text-gray-500">粘贴后按 Enter 即可保存</p>
+            </div>
+
+            <!-- 保存按钮 -->
+            <button
+              @click="saveToken"
+              class="w-full py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold hover:shadow-lg active:scale-[0.98] transition-all"
+            >
+              💾 保存 Token
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+  </div>
+
+  <!-- ========== Vue 应用逻辑 ========== -->
+  <script>
+    const { createApp, ref, computed, reactive, watch, onMounted, nextTick } = Vue;
+
+    createApp({
+      setup() {
+        // ==================== Gist 云同步配置 ====================
+        // 🔑 在 https://gist.github.com 创建一个文件名 caidan-data.json 的 Gist，把 ID 填到下面
+        // 创建好 Gist 后，浏览器地址栏的 URL 类似：https://gist.github.com/你的用户名/abc123def456
+        // 把 abc123def456 这一段复制到 GIST_ID
+        const GIST_ID = '52ea56e53d1dd00366f7d580d0dd3c94';
+        const GITHUB_TOKEN = ''; // 不在这里填写 Token，在数据管理弹窗里输入（存到 localStorage，仅本机）
+
+        let gistReady = false;
+        let githubToken = ''; // 从 localStorage 读取或用户输入
+        const lastSyncTime = ref('从未同步');
+        const isSyncing = ref(false);
+        const showTokenDialog = ref(false);
+        const tokenInput = ref('');
+        const tokenConfigSaved = ref(false);
+        const showToken = ref(false);
+
+        // 初始化
+        if (GIST_ID && GIST_ID !== 'YOUR_GIST_ID_HERE') {
+          gistReady = true;
+          // 从 localStorage 读取已保存的 token
+          try {
+            const savedToken = localStorage.getItem('caidan_github_token');
+            if (savedToken) {
+              githubToken = savedToken;
+              tokenConfigSaved.value = true;
+              console.log('✅ Gist 云同步已启用（已读取本地 Token）');
+            } else {
+              console.log('✅ Gist ID 已配置，需要输入 Token 才能写入');
+            }
+          } catch (e) {}
+        } else {
+          console.log('💾 使用本地模式（配置 Gist ID 后可启用云同步）');
+        }
+
+        // 保存 token
+        function saveToken() {
+          const t = tokenInput.value.trim();
+          if (!t) {
+            showToast('Token 不能为空', 'error');
+            return;
+          }
+          if (!t.startsWith('ghp_') && !t.startsWith('github_pat_')) {
+            if (!confirm('Token 格式看起来不像 GitHub Token（应以 ghp_ 或 github_pat_ 开头），确定要保存吗？')) return;
+          }
+          try {
+            localStorage.setItem('caidan_github_token', t);
+            githubToken = t;
+            tokenConfigSaved.value = true;
+            showTokenDialog.value = false;
+            showToast('🔑 Token 已保存到本机', 'success');
+            // 立即尝试推送一次
+            setTimeout(() => pushToGist(), 500);
+          } catch (e) {
+            showToast('保存失败：' + e.message, 'error');
+          }
+        }
+
+        // 清除 token
+        function clearToken() {
+          if (!confirm('确定要清除 Token 吗？清除后只能拉取云端数据，无法推送。')) return;
+          try {
+            localStorage.removeItem('caidan_github_token');
+            githubToken = '';
+            tokenConfigSaved.value = false;
+            tokenInput.value = '';
+            showToast('🗑️ Token 已清除', 'success');
+          } catch (e) {
+            showToast('清除失败：' + e.message, 'error');
+          }
+        }
+
+        // ==================== 预设数据 ====================
+        const defaultDishes = [
+          {
+            id: 1,
+            name: '番茄炒蛋',
+            category: '家常菜',
+            cookingTime: '15分钟',
+            image: 'https://images.unsplash.com/photo-1592417817098-8fd3d9eb14a5?w=600&h=450&fit=crop',
+            ingredients: [
+              { name: '番茄', amount: '2个' },
+              { name: '鸡蛋', amount: '3个' },
+              { name: '葱', amount: '1根' },
+              { name: '盐', amount: '适量' },
+              { name: '糖', amount: '1小勺' },
+              { name: '食用油', amount: '适量' },
+            ],
+            steps: [
+              { title: '准备食材', description: '番茄洗净切块，鸡蛋打入碗中加少许盐打散，葱切葱花备用。', image: '' },
+              { title: '炒鸡蛋', description: '锅中倒油烧热，倒入蛋液，用筷子快速划散，炒至凝固盛出备用。', image: '' },
+              { title: '炒番茄', description: '锅中再加少许油，放入番茄块翻炒，中火炒出汤汁，加糖提鲜。', image: '' },
+              { title: '混合出锅', description: '将炒好的鸡蛋倒回锅中，与番茄翻炒均匀，加盐调味，撒葱花出锅。', image: '' },
+            ],
+            tips: '炒番茄时加一小勺白糖可以中和酸味，让口感更鲜甜。鸡蛋不要炒太老，嫩滑才好吃！'
+          },
+          {
+            id: 2,
+            name: '酸辣土豆丝',
+            category: '快手菜',
+            cookingTime: '10分钟',
+            image: 'https://images.unsplash.com/photo-1635363638580-c2809d049eee?w=600&h=450&fit=crop',
+            ingredients: [
+              { name: '土豆', amount: '2个' },
+              { name: '干辣椒', amount: '3-4个' },
+              { name: '花椒', amount: '少许' },
+              { name: '醋', amount: '2勺' },
+              { name: '盐', amount: '适量' },
+              { name: '蒜', amount: '2瓣' },
+            ],
+            steps: [
+              { title: '处理土豆', description: '土豆去皮切细丝，放入清水中浸泡去掉多余淀粉，捞出沥干。', image: '' },
+              { title: '爆香调料', description: '锅中热油，放入花椒和干辣椒段小火爆香，再加入蒜末炒出香味。', image: '' },
+              { title: '快速翻炒', description: '大火放入土豆丝快速翻炒，加入醋和盐，翻炒约2分钟至断生即可。', image: '' },
+              { title: '出锅装盘', description: '土豆丝变透明即可出锅，不宜炒太久以保持爽脆口感。', image: '' },
+            ],
+            tips: '土豆丝一定要用清水浸泡去掉淀粉，这样炒出来才会爽脆不粘锅。醋要早放，酸味更入味！'
+          },
+          {
+            id: 3,
+            name: '玉米排骨汤',
+            category: '汤品',
+            cookingTime: '60分钟',
+            image: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=600&h=450&fit=crop',
+            ingredients: [
+              { name: '排骨', amount: '500g' },
+              { name: '甜玉米', amount: '2根' },
+              { name: '胡萝卜', amount: '1根' },
+              { name: '姜', amount: '3片' },
+              { name: '枸杞', amount: '少许' },
+              { name: '盐', amount: '适量' },
+            ],
+            steps: [
+              { title: '排骨焯水', description: '排骨冷水下锅，加姜片和料酒，大火煮开后撇去浮沫，捞出洗净。', image: '' },
+              { title: '准备配料', description: '玉米切段，胡萝卜去皮切滚刀块，姜切片备用。', image: '' },
+              { title: '慢炖', description: '将排骨、玉米、胡萝卜、姜片放入砂锅，加入足量清水，大火煮开后转小火慢炖50分钟。', image: '' },
+              { title: '调味出锅', description: '出锅前5分钟加入枸杞，加盐调味即可。汤色奶白，鲜甜可口！', image: '' },
+            ],
+            tips: '排骨一定要冷水下锅焯水，热水下锅会让肉质紧缩变柴。小火慢炖才能让汤变白变浓。'
+          },
+          {
+            id: 4,
+            name: '巧克力熔岩蛋糕',
+            category: '烘焙',
+            cookingTime: '25分钟',
+            image: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&h=450&fit=crop',
+            ingredients: [
+              { name: '黑巧克力', amount: '100g' },
+              { name: '黄油', amount: '50g' },
+              { name: '鸡蛋', amount: '2个' },
+              { name: '细砂糖', amount: '40g' },
+              { name: '低筋面粉', amount: '30g' },
+            ],
+            steps: [
+              { title: '融化巧克力', description: '黑巧克力和黄油隔水加热融化，搅拌至顺滑，放凉备用。', image: '' },
+              { title: '打发鸡蛋', description: '鸡蛋和细砂糖用打蛋器打发至浓稠发白，体积膨胀约2倍。', image: '' },
+              { title: '混合面糊', description: '将巧克力液倒入蛋糊中翻拌均匀，筛入低筋面粉，轻柔翻拌至无干粉。', image: '' },
+              { title: '烘烤', description: '倒入模具（8分满），放入预热200°C的烤箱中层，烤10-12分钟。表面凝固而内部流动即可。', image: '' },
+            ],
+            tips: '烤制时间很关键！时间太长内部就全熟了，10分钟左右表面定型即可。出炉后趁热脱模，切开会有熔岩流心效果~'
+          },
+          {
+            id: 5,
+            name: '凉拌黄瓜',
+            category: '凉菜',
+            cookingTime: '5分钟',
+            image: 'https://images.unsplash.com/photo-1595543629808-9a8d2f2b6c62?w=600&h=450&fit=crop',
+            ingredients: [
+              { name: '黄瓜', amount: '2根' },
+              { name: '蒜', amount: '3瓣' },
+              { name: '生抽', amount: '2勺' },
+              { name: '醋', amount: '1勺' },
+              { name: '芝麻油', amount: '1勺' },
+              { name: '辣椒油', amount: '适量' },
+              { name: '白芝麻', amount: '少许' },
+            ],
+            steps: [
+              { title: '处理黄瓜', description: '黄瓜洗净，用刀背拍碎后切段，放入大碗中。拍黄瓜比切的口感更好！', image: '' },
+              { title: '制作酱汁', description: '蒜切末放入小碗，加入生抽、醋、芝麻油、辣椒油搅拌均匀。', image: '' },
+              { title: '拌匀装盘', description: '将酱汁浇在黄瓜上，撒上白芝麻，拌匀即可食用。', image: '' },
+            ],
+            tips: '用刀背拍黄瓜能让纤维断裂，更容易入味。拌好后放冰箱冷藏10分钟更爽脆！'
+          },
+        ];
+
+        // ==================== 响应式状态 ====================
+        const dishes = ref([]);
+        const selectedIds = ref(new Set());
+        const activeCategory = ref('全部');
+        const activeTab = ref('home');
+        const showAddModal = ref(false);
+        const showSelectedList = ref(false);
+        const currentDish = ref(null);
+        const showGuide = ref(true);
+        const isIOS = ref(false);
+        const showSettings = ref(false);
+
+        // Toast
+        const toast = reactive({ show: false, message: '', type: 'success' });
+        let toastTimer = null;
+
+        // 表单
+        const form = reactive({
+          name: '',
+          category: '',
+          cookingTime: '',
+          image: '',
+          ingredients: [{ name: '', amount: '' }],
+          steps: [{ title: '', description: '', image: '' }],
+          tips: '',
+        });
+
+        // ==================== 分类列表 ====================
+        const categories = computed(() => {
+          const cats = new Set(dishes.value.map(d => d.category));
+          return ['全部', ...Array.from(cats)];
+        });
+
+        // ==================== 筛选后的菜品 ====================
+        const filteredDishes = computed(() => {
+          if (activeCategory.value === '全部') return dishes.value;
+          return dishes.value.filter(d => d.category === activeCategory.value);
+        });
+
+        // ==================== 已选菜品 ====================
+        const selectedDishes = computed(() => {
+          return dishes.value.filter(d => selectedIds.value.has(d.id));
+        });
+
+        // ==================== 方法 ====================
+        function isSelected(id) {
+          return selectedIds.value instanceof Set
+            ? selectedIds.value.has(id)
+            : false;
+        }
+
+        function toggleSelect(dish) {
+          const newSet = new Set(selectedIds.value);
+          if (newSet.has(dish.id)) {
+            newSet.delete(dish.id);
+          } else {
+            newSet.add(dish.id);
+          }
+          selectedIds.value = newSet;
+        }
+
+        function clearAll() {
+          selectedIds.value = new Set();
+          showToast('已清空菜单', 'success');
+        }
+
+        function openDetail(dish) {
+          currentDish.value = dish;
+          document.body.style.overflow = 'hidden';
+        }
+
+        function closeDetail() {
+          currentDish.value = null;
+          document.body.style.overflow = '';
+        }
+
+        function showToast(message, type = 'success') {
+          toast.message = message;
+          toast.type = type;
+          toast.show = true;
+          if (toastTimer) clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => {
+            toast.show = false;
+          }, 2000);
+        }
+
+        function addDish() {
+          // 验证
+          if (!form.name.trim()) {
+            showToast('请输入菜名', 'error');
+            return;
+          }
+          if (!form.category) {
+            showToast('请选择分类', 'error');
+            return;
+          }
+          if (!form.cookingTime.trim()) {
+            showToast('请输入烹饪时间', 'error');
+            return;
+          }
+
+          const validIngredients = form.ingredients.filter(i => i.name.trim());
+          if (validIngredients.length === 0) {
+            showToast('请至少添加一种食材', 'error');
+            return;
+          }
+
+          const validSteps = form.steps.filter(s => s.title.trim() || s.description.trim());
+          if (validSteps.length === 0) {
+            showToast('请至少添加一个烹饪步骤', 'error');
+            return;
+          }
+
+          const newId = dishes.value.length > 0
+            ? Math.max(...dishes.value.map(d => d.id)) + 1
+            : 1;
+
+          const newDish = {
+            id: newId,
+            name: form.name.trim(),
+            category: form.category,
+            cookingTime: form.cookingTime.trim(),
+            image: form.image.trim() || '',
+            ingredients: validIngredients.map(i => ({
+              name: i.name.trim(),
+              amount: i.amount.trim() || '适量',
+            })),
+            steps: validSteps.map(s => ({
+              title: s.title.trim() || '步骤',
+              description: s.description.trim(),
+              image: s.image.trim() || '',
+            })),
+            tips: form.tips.trim(),
+          };
+
+          dishes.value.push(newDish);
+          saveToStorage();
+          resetForm();
+          showAddModal.value = false;
+          showToast('🎉 菜品录入成功！', 'success');
+        }
+
+        function resetForm() {
+          form.name = '';
+          form.category = '';
+          form.cookingTime = '';
+          form.image = '';
+          form.ingredients = [{ name: '', amount: '' }];
+          form.steps = [{ title: '', description: '', image: '' }];
+          form.tips = '';
+        }
+
+        function handleImgError(e) {
+          e.target.style.display = 'none';
+        }
+
+        function getEmoji(category) {
+          const map = {
+            '家常菜': '🍲',
+            '快手菜': '⚡',
+            '汤品': '🍜',
+            '烘焙': '🍰',
+            '凉菜': '🥗',
+          };
+          return map[category] || '🍽️';
+        }
+
+        function shareMenu() {
+          if (selectedDishes.value.length === 0) {
+            showToast('请先选择菜品', 'error');
+            return;
+          }
+          const text = selectedDishes.value.map((d, i) =>
+            `${i + 1}. ${d.name}（${d.cookingTime}）`
+          ).join('\n');
+
+          if (navigator.share) {
+            navigator.share({
+              title: '今日菜单',
+              text: `🍳 今日菜单：\n${text}`,
+            }).catch(() => {});
+          } else {
+            navigator.clipboard.writeText(`🍳 今日菜单：\n${text}`).then(() => {
+              showToast('📋 菜单已复制到剪贴板', 'success');
+            }).catch(() => {
+              showToast('分享失败，请重试', 'error');
+            });
+          }
+        }
+
+        function exportData() {
+          const data = JSON.stringify(dishes.value, null, 2);
+          const blob = new Blob([data], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `菜谱数据_${new Date().toISOString().slice(0, 10)}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('📤 数据已导出！', 'success');
+        }
+
+        function importData(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const data = JSON.parse(ev.target.result);
+              if (!Array.isArray(data)) throw new Error('格式错误');
+              dishes.value = data;
+              saveToStorage();
+              showToast('📥 数据导入成功！共 ' + data.length + ' 道菜', 'success');
+            } catch (err) {
+              showToast('❌ 文件格式不正确', 'error');
+            }
+          };
+          reader.readAsText(file);
+          e.target.value = '';
+        }
+
+        function resetData() {
+          if (confirm('确定要恢复默认数据吗？当前所有菜品将被清空。')) {
+            dishes.value = JSON.parse(JSON.stringify(defaultDishes));
+            saveToStorage();
+            showToast('🔄 已恢复默认数据', 'success');
+          }
+        }
+
+        // ==================== 数据同步 ====================
+        const STORAGE_KEY = 'caidan_dishes';
+
+        function saveToStorage() {
+          // 本地存储
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(dishes.value));
+          } catch (e) {
+            console.warn('localStorage 存储失败:', e);
+          }
+          // 云同步到 Gist（如果有 token）
+          if (gistReady && githubToken) {
+            pushToGist();
+          }
+        }
+
+        // 推送到 Gist
+        async function pushToGist() {
+          if (!GIST_ID || !githubToken) return;
+          isSyncing.value = true;
+          try {
+            const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `token ${githubToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                files: {
+                  'caidan-data.json': {
+                    content: JSON.stringify(dishes.value, null, 2)
+                  }
+                }
+              })
+            });
+            if (res.ok) {
+              const now = new Date();
+              lastSyncTime.value = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+              console.log('✅ 已同步到 Gist');
+            } else {
+              console.warn('Gist 同步失败:', res.status);
+            }
+          } catch (e) {
+            console.warn('Gist 同步失败:', e.message);
+          } finally {
+            isSyncing.value = false;
+          }
+        }
+
+        // 从 Gist 拉取
+        async function pullFromGist() {
+          if (!GIST_ID) return false;
+          isSyncing.value = true;
+          try {
+            const res = await fetch(`https://api.github.com/gists/${GIST_ID}`);
+            if (!res.ok) throw new Error('拉取失败');
+            const data = await res.json();
+            const file = data.files['caidan-data.json'];
+            if (file && file.content) {
+              const parsed = JSON.parse(file.content);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                dishes.value = parsed;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+                const now = new Date();
+                lastSyncTime.value = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                showToast('☁️ 已从云端拉取 ' + parsed.length + ' 道菜', 'success');
+                return true;
+              }
+            }
+          } catch (e) {
+            showToast('❌ 拉取失败：' + e.message, 'error');
+          } finally {
+            isSyncing.value = false;
+          }
+          return false;
+        }
+
+        // 一键云同步（手动）
+        async function manualSync() {
+          if (pullFromGist()) {
+            // 拉取成功，再推一次（确保本地变更也上云）
+            setTimeout(() => pushToGist(), 500);
+          } else {
+            pushToGist();
+            showToast('☁️ 已推送到云端', 'success');
+          }
+        }
+
+        function loadFromStorage() {
+          // 先加载本地
+          try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                dishes.value = parsed;
+              }
+            }
+          } catch (e) {
+            console.warn('localStorage 读取失败:', e);
+          }
+
+          // 本地为空时使用默认
+          if (dishes.value.length === 0) {
+            dishes.value = JSON.parse(JSON.stringify(defaultDishes));
+            saveToStorage();
+          }
+
+          // 配置了 Gist 但没拉取过 → 5秒后自动拉取
+          if (gistReady) {
+            setTimeout(() => {
+              pullFromGist().then(success => {
+                if (success) console.log('☁️ Gist 初始化完成');
+              });
+            }, 5000);
+          }
+        }
+
+        // ==================== 生命周期 ====================
+        onMounted(() => {
+          loadFromStorage();
+          // 检测 iOS
+          isIOS.value = /iPhone|iPad|iPod/.test(navigator.userAgent);
+          // 如果已安装为 PWA，隐藏引导
+          if (window.matchMedia('(display-mode: standalone)').matches) {
+            showGuide.value = false;
+          }
+        });
+
+        // 监听 dishes 变化自动保存
+        watch(dishes, () => {
+          saveToStorage();
+        }, { deep: true });
+
+        // 关闭弹窗时恢复滚动
+        watch(showAddModal, (val) => {
+          if (!val) {
+            document.body.style.overflow = '';
+            activeTab.value = 'home';
+          } else {
+            document.body.style.overflow = 'hidden';
+            activeTab.value = 'add';
+          }
+        });
+
+        watch(showSelectedList, (val) => {
+          if (!val) document.body.style.overflow = '';
+          else document.body.style.overflow = 'hidden';
+        });
+
+        watch(showSettings, (val) => {
+          if (!val) document.body.style.overflow = '';
+          else document.body.style.overflow = 'hidden';
+        });
+
+        watch(showTokenDialog, (val) => {
+          if (!val) document.body.style.overflow = '';
+          else document.body.style.overflow = 'hidden';
+        });
+
+        return {
+          dishes,
+          selectedIds,
+          activeCategory,
+          activeTab,
+          categories,
+          filteredDishes,
+          selectedDishes,
+          showAddModal,
+          showSelectedList,
+          showGuide,
+          isIOS,
+          showSettings,
+          gistReady,
+          lastSyncTime,
+          isSyncing,
+          showTokenDialog,
+          tokenInput,
+          tokenConfigSaved,
+          showToken,
+          currentDish,
+          toast,
+          form,
+          isSelected,
+          toggleSelect,
+          clearAll,
+          openDetail,
+          closeDetail,
+          addDish,
+          handleImgError,
+          getEmoji,
+          shareMenu,
+          exportData,
+          importData,
+          resetData,
+          manualSync,
+          pushToGist,
+          pullFromGist,
+          saveToken,
+          clearToken,
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
