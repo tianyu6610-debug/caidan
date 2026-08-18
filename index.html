@@ -281,6 +281,17 @@
               ⏱ {{ dish.cookingTime }}
             </span>
 
+            <!-- 删除按钮 -->
+            <button
+              @click.stop="deleteDish(dish)"
+              class="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center shadow-lg backdrop-blur-sm active:scale-90 transition-transform"
+              aria-label="删除菜品"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+
             <!-- 选中勾选 -->
             <div
               v-if="isSelected(dish.id)"
@@ -509,14 +520,25 @@
                 <p class="text-xs text-gray-400">{{ currentDish.category }} · ⏱ {{ currentDish.cookingTime }}</p>
               </div>
             </div>
-            <button
-              @click="closeDetail"
-              class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                @click="deleteDish(currentDish)"
+                class="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                aria-label="删除菜品"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </button>
+              <button
+                @click="closeDetail"
+                class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <!-- Drawer 内容 -->
@@ -1277,6 +1299,19 @@
           showToast('已清空菜单', 'success');
         }
 
+        function deleteDish(dish) {
+          if (!confirm(`确定删除「${dish.name}」吗？删除后将同步到云端。`)) return;
+          dishes.value = dishes.value.filter(d => d.id !== dish.id);
+          const newSet = new Set(selectedIds.value);
+          newSet.delete(dish.id);
+          selectedIds.value = newSet;
+          saveToStorage();
+          if (currentDish.value && currentDish.value.id === dish.id) {
+            closeDetail();
+          }
+          showToast(`已删除「${dish.name}」`, 'success');
+        }
+
         function openDetail(dish) {
           currentDish.value = dish;
           document.body.style.overflow = 'hidden';
@@ -1628,6 +1663,7 @@
           isSelected,
           toggleSelect,
           clearAll,
+          deleteDish,
           openDetail,
           closeDetail,
           addDish,
